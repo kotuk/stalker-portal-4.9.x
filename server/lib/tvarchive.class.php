@@ -47,7 +47,7 @@ class TvArchive extends Master implements \Stalker\Lib\StbApi\TvArchive
         $tz = new DateTimeZone(Stb::$server_timezone);
 
         $date = new DateTime(date('r', strtotime($program['time'])));
-        $date->setTimeZone($tz);
+        $date->setTimezone($tz);
 
         if ($overlap_start){
             $date->sub(new DateInterval('PT'.$overlap_start.'S'));
@@ -56,7 +56,7 @@ class TvArchive extends Master implements \Stalker\Lib\StbApi\TvArchive
         $date_now = new DateTime('now', new DateTimeZone(Stb::$server_timezone));
 
         $date_to = new DateTime(date('r', strtotime($program['time_to'])));
-        $date_to->setTimeZone($tz);
+        $date_to->setTimezone($tz);
 
         $dst_diff = $date->format('Z') - $date_now->format('Z');
 
@@ -78,13 +78,7 @@ class TvArchive extends Master implements \Stalker\Lib\StbApi\TvArchive
 
         $channel = Itv::getChannelById($program['ch_id']);
 
-        $filename = $date->format("Ymd-H");
-
-        if ($channel['wowza_dvr']){
-            $filename .= '.mp4';
-        }else{
-            $filename .= '.mpg';
-        }
+        $filename = $date->format("Ymd-H") . '.mpg';
 
         $res['storage_id'] = $storage['id'];
 
@@ -98,40 +92,12 @@ class TvArchive extends Master implements \Stalker\Lib\StbApi\TvArchive
                     $res['cmd'] = 'http://'.$storage['storage_ip'].'/'.$match[2].'/archive/'.$start_timestamp.'/'.($stop_timestamp - $start_timestamp).'/mpegts';
                 }else{
                     $res['cmd'] = preg_replace('/:\/\/([^\/]*)/', '://'.$storage['storage_ip'], $channel['mc_cmd']);
-                    $res['cmd'] = preg_replace('/\.m3u8/', '-' . $start_timestamp
-                        . '-' . ($stop_timestamp - $start_timestamp) . '.m3u8', $res['cmd']);
+                    $res['cmd'] = preg_replace('/\.m3u8/', '-' . $start_timestamp . '-' . ($stop_timestamp - $start_timestamp) . '.m3u8', $res['cmd']);
                 }
 
-                $res['cmd'] .= '?ch_id=' . $program['ch_id']
-                    . '&token='.$this->createTemporaryToken($this->stb->id)
-                    . '&start=' . $position
-                    . '&duration=' . ($stop_timestamp - $start_timestamp)
-                    . '&osd_title=' . urlencode($channel['name'].' — '.$program['name'])
-                    . '&real_id=' . $program['real_id'];
+                $res['cmd'] .= '?token='.$this->createTemporaryToken($this->stb->id);
 
                 $res['download_cmd'] = 'http://'.$storage['storage_ip'].'/'.$match[2].'/archive-'.$start_timestamp.'-'.($stop_timestamp - $start_timestamp).'.ts';
-
-            }else{
-                $res['error'] = 'link_fault';
-            }
-
-        }elseif ($storage['wowza_dvr']){
-
-            if (preg_match("/:\/\/([^\/]*)\/.*\.m3u8/", $channel['mc_cmd'], $match)){
-
-                $res['cmd'] = preg_replace('/:\/\/([^\/]*)/', '://'.$storage['storage_ip'], $channel['mc_cmd']);
-                $res['cmd'] = preg_replace('/\.m3u8.*/',
-                    '.m3u8?DVR&wowzadvrplayliststart=' . gmdate("YmdHis", $start_timestamp)
-                    . '&wowzadvrplaylistduration=' . ($stop_timestamp - $start_timestamp)*1000,
-                    $res['cmd'])
-                    . '&ch_id=' . $program['ch_id']
-                    . '&token='.$this->createTemporaryToken("1")
-                    . '&start=' . $position
-                    . '&duration=' . ($stop_timestamp - $start_timestamp)
-                    . '&osd_title=' . urlencode($channel['name'].' — '.$program['name'])
-                    . '&real_id=' . $program['real_id'];
-
-                $res['download_cmd'] = false;
 
             }else{
                 $res['error'] = 'link_fault';
@@ -140,12 +106,7 @@ class TvArchive extends Master implements \Stalker\Lib\StbApi\TvArchive
         }else{
             $res['cmd'] = Config::getSafe('tv_archive_player_solution', 'ffmpeg').' http://' . $storage['storage_ip'] . ':' . $storage['apache_port']
                 . '/stalker_portal/storage/get.php?filename=' . $filename
-                . '&ch_id=' . $program['ch_id']
-                . '&token='.$this->createTemporaryToken(true)
-                . '&start=' . $position
-                . '&duration=' . ($stop_timestamp - $start_timestamp)
-                . '&osd_title=' . urlencode($channel['name'].' — '.$program['name'])
-                . '&real_id=' . $program['real_id'];
+                . '&token='.$this->createTemporaryToken(true);
 
             if (!empty($_REQUEST['download'])){
                 $downloads = new Downloads();
@@ -154,6 +115,12 @@ class TvArchive extends Master implements \Stalker\Lib\StbApi\TvArchive
                 $res['download_cmd'] = false;
             }
         }
+
+        $res['cmd'] .= '&ch_id=' . $program['ch_id']
+            . '&start=' . $position
+            . '&duration=' . ($stop_timestamp - $start_timestamp)
+            . '&osd_title=' . urlencode($channel['name'].' — '.$program['name'])
+            . '&real_id=' . $program['real_id'];
 
         $res['to_file'] = date("Ymd-H", $start_timestamp).'_'.System::transliterate($channel['name'].'_'.$program['name']).'.mpg';
 
@@ -215,7 +182,7 @@ class TvArchive extends Master implements \Stalker\Lib\StbApi\TvArchive
         $tz = new DateTimeZone(!empty(Stb::$server_timezone) ? Stb::$server_timezone : date_default_timezone_get());
 
         $date = new DateTime(date('r', strtotime($program['time'])));
-        $date->setTimeZone($tz);
+        $date->setTimezone($tz);
 
         // previous part overlap compensation
 
@@ -232,7 +199,7 @@ class TvArchive extends Master implements \Stalker\Lib\StbApi\TvArchive
         $date_now = new DateTime('now', new DateTimeZone(!empty(Stb::$server_timezone) ? Stb::$server_timezone : date_default_timezone_get()));
 
         $date_to = new DateTime(date('r', strtotime($program['time_to'])));
-        $date_to->setTimeZone($tz);
+        $date_to->setTimezone($tz);
 
         $dst_diff = $date->format('Z') - $date_now->format('Z');
 
@@ -254,17 +221,13 @@ class TvArchive extends Master implements \Stalker\Lib\StbApi\TvArchive
 
         $channel = Itv::getChannelById($program['ch_id']);
 
-        $filename = $date->format("Ymd-H");
-
-        if ($channel['wowza_dvr']){
-            $filename .= '.mp4';
-        }else{
-            $filename .= '.mpg';
-        }
+        $filename = $date->format("Ymd-H") . '.mpg';
 
         $position = date("i", $start_timestamp) * 60 + date("s", $start_timestamp);
 
         $channel = Itv::getChannelById($program['ch_id']);
+
+        $url = false;
 
         if ($storage['flussonic_dvr']){
 
@@ -274,56 +237,30 @@ class TvArchive extends Master implements \Stalker\Lib\StbApi\TvArchive
                     $url = 'http://'.$storage['storage_ip'].'/'.$match[2].'/archive/'.$start_timestamp.'/'.($stop_timestamp - $start_timestamp).'/mpegts';
                 }else{
                     $url = preg_replace('/:\/\/([^\/]*)/', '://'.$storage['storage_ip'], $channel['mc_cmd']);
-                    $url = preg_replace('/\.m3u8/', '-' . $start_timestamp
-                        . '-' . ($stop_timestamp - $start_timestamp) . '.m3u8', $url);
+                    $url = preg_replace('/\.m3u8/', '-' . $start_timestamp . '-' . ($stop_timestamp - $start_timestamp) . '.m3u8', $url);
                 }
 
-                $url .= '?ch_id=' . $program['ch_id']
-                    . '&token='.$this->createTemporaryToken($this->stb->id)
-                    . '&start=' . $position
-                    . '&duration=' . ($stop_timestamp - $start_timestamp)
-                    . '&osd_title=' . urlencode($channel['name'].' — '.$program['name'])
-                    . '&real_id=' . $program['real_id'];
-
-            }else{
-                $url = false;
-            }
-
-        }elseif ($storage['wowza_dvr']){
-
-            if (preg_match("/:\/\/([^\/]*)\/.*\.m3u8/", $channel['mc_cmd'], $match)){
-
-                $url = preg_replace('/:\/\/([^\/]*)/', '://'.$storage['storage_ip'], $channel['mc_cmd']);
-                $url = preg_replace('/\.m3u8.*/',
-                    '.m3u8?DVR&wowzadvrplayliststart=' . gmdate("YmdHis", $start_timestamp)
-                    . '&wowzadvrplaylistduration=' . ($stop_timestamp - $start_timestamp)*1000,
-                    $url)
-                    . '&ch_id=' . $program['ch_id']
-                    . '&token='.$this->createTemporaryToken("1")
-                    . '&start=' . $position
-                    . '&duration=' . ($stop_timestamp - $start_timestamp)
-                    . '&osd_title=' . urlencode($channel['name'].' — '.$program['name'])
-                    . '&real_id=' . $program['real_id'];
-
-            }else{
-                $url = false;
+                $url .= '?token='.$this->createTemporaryToken($this->stb->id);
             }
 
         }else{
             $url = 'http://' . $storage['storage_ip'] . ':' . $storage['apache_port']
                 . '/stalker_portal/storage/get.php?filename=' . $filename
-                . '&ch_id=' . $program['ch_id']
-                . '&token='.$this->createTemporaryToken(true)
-                . '&start=' . $position
-                . '&duration=' . ($stop_timestamp - $start_timestamp)
-                . '&osd_title=' . urlencode($channel['name'].' — '.$program['name'])
-                . '&real_id=' . $program['real_id'];
+                . '&token='.$this->createTemporaryToken(true);
+        }
+
+        if ($url !== false) {
+            $url .= '&ch_id=' . $program['ch_id']
+            . '&start=' . $position
+            . '&duration=' . ($stop_timestamp - $start_timestamp)
+            . '&osd_title=' . urlencode($channel['name'].' — '.$program['name'])
+            . '&real_id=' . $program['real_id'];
         }
 
         if (!empty($storage['storage_name'])){
             $cache = Cache::getInstance();
             $cache->set($this->stb->id.'_playback',
-                array('type' => 'tv-archive', 'id' => $program_id, 'storage' => $storage['storage_name']), 0, 10);
+                array('type' => 'tv-archive', 'id' => $program_id, 'storage' => $storage['storage_name'], 'storage_id' => $storage['id']), 0, 10);
         }else{
             $cache = Cache::getInstance();
             $cache->del($this->stb->id.'_playback');
@@ -441,12 +378,10 @@ class TvArchive extends Master implements \Stalker\Lib\StbApi\TvArchive
 
         $storage = Master::getStorageByName($task['storage_name']);
 
-        //$channel = Itv::getChannelById($ch_id);
-
         $tz = new DateTimeZone(Stb::$server_timezone);
 
         $date = new DateTime(date('r'));
-        $date->setTimeZone($tz);
+        $date->setTimezone($tz);
 
         $date_now = new DateTime('now', new DateTimeZone(Stb::$server_timezone));
 
@@ -473,68 +408,36 @@ class TvArchive extends Master implements \Stalker\Lib\StbApi\TvArchive
             if (preg_match("/:\/\/([^\/]*)\/([^\/]*).*(mpegts|m3u8)$/", $channel['mc_cmd'], $match)){
 
                 if ($match[3] == 'mpegts'){
-                    $res['cmd'] = 'http://'.$storage['storage_ip'].'/'.$match[2].'/archive/'.strtotime(date("Y-m-d H:00:00")).'/3600/mpegts';
+                    $res['cmd'] = 'http://' . $storage['storage_ip'] . '/' . $match[2] . '/archive/' . strtotime(date("Y-m-d H:00:00")) . '/3600/mpegts';
                 }else{
-                    $res['cmd'] = preg_replace('/:\/\/([^\/]*)/', '://'.$storage['storage_ip'], $channel['mc_cmd']);
-                    $res['cmd'] = preg_replace('/\.m3u8/', '-' . strtotime(date("Y-m-d H:00:00"))
-                        . '-3600' . '.m3u8', $res['cmd']); // todo: current hour?
+                    $res['cmd'] = preg_replace('/:\/\/([^\/]*)/', '://' . $storage['storage_ip'], $channel['mc_cmd']);
+                    $res['cmd'] = preg_replace('/\.m3u8/', '-' . strtotime(date("Y-m-d H:00:00")) . '-now' . '.m3u8', $res['cmd']);
                 }
 
-                $res['cmd'] .= ''
-                    . '?token='.$this->createTemporaryToken($this->stb->id)
-                    . ' position:' . $position
-                    . ' media_len:' . (intval(date("H")) * 3600 + intval(date("i")) * 60 + intval(date("s")));
+                $res['cmd'] .= '?token=' . $this->createTemporaryToken($this->stb->id);
 
             }else{
                 $res['error'] = 'server_error';
             }
 
-        }elseif ($channel['wowza_dvr']){
+        } else {
 
-            if (preg_match("/:\/\/([^\/]*)\/.*\.m3u8/", $channel['mc_cmd'], $match)){
-
-                $url = preg_replace('/:\/\/([^\/]*)/', '://'.$storage['storage_ip'], $channel['mc_cmd']);
-                $res['cmd'] = preg_replace('/\.m3u8.*/',
-                        '.m3u8?DVR&wowzadvrplayliststart=' . gmdate("YmdH0000")
-                        . '&wowzadvrplaylistduration=3600000', // todo: in current hour without duration?
-                        $url)
-                    . '&token='.$this->createTemporaryToken("1")
-                    . ' position:' . $position
-                    . ' media_len:' . (intval(date("H")) * 3600 + intval(date("i")) * 60 + intval(date("s")));
-
-            }else{
-                $res['error'] = 'server_error';
-            }
-
-            return $res;
-
-        }else{
+            $res['cmd'] = 'ffmpeg http://' . $storage['storage_ip'];
 
             if (Config::getSafe('enable_timeshift_tmp_link', false)){
 
-                $redirect_url = '/archive/' . $ch_id . '/' . $filename;
+                $link_result = $this->createTemporaryTimeShiftToken('/archive/' . $ch_id . '/' . $filename);
 
-                $link_result = $this->createTemporaryTimeShiftToken($redirect_url);
+                $res['cmd'] .= '/tslink/'. $link_result . '/archive/' ;
 
-                $res['cmd'] = 'ffmpeg http://' . $storage['storage_ip']
-                . '/tslink/'.$link_result
-                . '/archive/'
-                . $ch_id
-                . '/'
-                . $filename
-                . ' position:' . $position
-                . ' media_len:' . (intval(date("H")) * 3600 + intval(date("i")) * 60 + intval(date("s")));
             }else{
-
-                $res['cmd'] = 'ffmpeg http://' . $storage['storage_ip']
-                . '/archive/'
-                . $ch_id
-                . '/'
-                . $filename
-                . ' position:' . $position
-                . ' media_len:' . (intval(date("H")) * 3600 + intval(date("i")) * 60 + intval(date("s")));
+                $res['cmd'] .= '/archive/';
             }
+
+            $res['cmd'] .= $ch_id . '/' . $filename;
         }
+
+        $res['cmd'] .= ' position:' . $position . ' media_len:' . (intval(date("H")) * 3600 + intval(date("i")) * 60 + intval(date("s")));
 
         return $res;
 
