@@ -239,6 +239,10 @@ player.prototype.init = function(){
                     stb.user.play_in_preview_only_by_ok = stb.profile.play_in_preview_only_by_ok = params.play_in_preview_by_ok;
                 }
 
+                if (params.hasOwnProperty("show_after_loading")){
+                    stb.user.display_menu_after_loading = stb.profile.display_menu_after_loading = params.show_after_loading == 'main_menu';
+                }
+
                 if (params.hasOwnProperty("dvb_type") && module.dvb){
                     module.dvb.set_scan_type(params.dvb_type);
                 }
@@ -315,6 +319,10 @@ player.prototype.init = function(){
                 stbWindowMgr.windowShow(windowId);
             }else if (msg == 'exit'){
                 stbWebWindow.close();
+            }else if (msg == 'AutoUpdateWindow:opened'){
+                loader.pause();
+            }else if (msg == 'AutoUpdateWindow:closed'){
+                loader.resume();
             }
         };
 
@@ -1011,6 +1019,9 @@ player.prototype.event_callback = function(event, params){
     switch(event){
         case 1: // End of stream
         {
+
+            playback_limit.reset();
+
             try{
 
                 if (this.cur_media_item.stop_callback){
@@ -1418,7 +1429,7 @@ player.prototype.event_callback = function(event, params){
                 
                 this.send_played_video_timer = window.setTimeout(
                     function(){
-                        self.send_played_video(self.cur_media_item.id);
+                        self.send_played_video(self.cur_media_item.video_id || self.cur_media_item.id);
                     },
                     
                     time_send_played
@@ -1470,6 +1481,8 @@ player.prototype.event_callback = function(event, params){
         }
         case 5: // Not found
         {
+
+            playback_limit.reset();
 
             stb.key_lock = false;
 
@@ -1532,8 +1545,8 @@ player.prototype.event_callback = function(event, params){
             }else{
 
                 if (this.cur_media_item.media_type != 'vclub_ad' && this.play_continuously && this.cur_media_item.hasOwnProperty('series') && this.cur_media_item.series && this.cur_media_item.series.length > 0){
-
-                    var series_idx = this.cur_media_item.series.indexOf(this.cur_media_item.cur_series);
+		    
+                    var series_idx = this.cur_media_item.series.lastIndexOf(this.cur_media_item.cur_series);
 
                     _debug('series_idx before', series_idx);
 
@@ -1592,7 +1605,7 @@ player.prototype.event_callback = function(event, params){
                         }
 
                     }else{
-                        var idx = this.cur_media_item.playlist.indexOf(this.cur_media_item.cmd);
+                        var idx = this.cur_media_item.playlist.lastIndexOf(this.cur_media_item.cmd);
 
                         _debug('playlist idx', idx);
 
@@ -1634,8 +1647,9 @@ player.prototype.event_callback = function(event, params){
 
                             this.play(cur_media_item);
 
-                            break;
                         }
+
+                        break;
                     }
                 }
                 stb.remount_storages(
@@ -1665,6 +1679,13 @@ player.prototype.event_callback = function(event, params){
             }
             break;
         }
+
+        case 9: // Teletext subtitles
+        {
+            this.get_pids();
+
+            break;
+        }                                             
         case 35:
         { // PVR Error
             _debug('params', params);
@@ -1694,12 +1715,11 @@ player.prototype.event_callback = function(event, params){
             window.clearTimeout(this.hdmi_reaction_timer);
 
             _debug('stb.profile[hdmi_event_reaction]', stb.profile['hdmi_event_reaction']);
-            _debug('stb.power_off', stb.power_off);
             _debug('module.blocking.on', module.blocking.on);
             _debug('stb.hdmi_on', stb.hdmi_on);
             _debug('stb.profile[standby_on_hdmi_off]', stb.profile['standby_on_hdmi_off']);
 
-            if (stb.profile['hdmi_event_reaction'] == 1 && !module.blocking.on){
+            if (stb.profile['hdmi_event_reaction'] >= 1 && !module.blocking.on){
 
                 var hdmi_reaction_timeout = (stb.profile['hdmi_event_reaction'] == 1 || !stb.hdmi_on ? 5 : stb.profile['hdmi_event_reaction']) * 1000;
 
@@ -1719,7 +1739,7 @@ player.prototype.event_callback = function(event, params){
                             if (stb.cur_place == 'tv' && self.is_tv) {
                                 stb.player.stop();
                             } else if (!self.pause.on) {
-                                keydown_observer.emulate_key(key.PAUSE);
+                                keydown_observer.emulate_key(key.EXIT);
                             }
                         }
 
@@ -1748,6 +1768,8 @@ player.prototype.event_callback = function(event, params){
                             }
                         }
                     }
+
+                    module && module.tv && module.tv.recalculate_preview_mode();
 
                 }, hdmi_reaction_timeout);
 
@@ -2164,7 +2186,7 @@ player.prototype.define_media_type = function(cmd){
         
         _debug('stb.cur_place', stb.cur_place);
         
-        if ((cmd.indexOf('mmsh://') >=0 || cmd.indexOf('rtsp://') >=0 || cmd.indexOf('rtmp://') >=0 || cmd.indexOf('udp://') >=0 || cmd.indexOf('rtp://') >=0 || cmd.indexOf('http://') >=0 || cmd.indexOf('dvb://') >=0) && !this.active_time_shift && stb.cur_place != 'demo' && stb.cur_place != 'internet' && stb.cur_place != 'epg_simple' && stb.cur_place != 'epg' && stb.cur_place != 'radio' && stb.cur_place != 'vclub' && stb.cur_place != 'karaoke' && stb.cur_place != 'audioclub' && !this.cur_media_item.is_audio && !this.cur_media_item.promo && !this.cur_media_item.radio){
+        if ((cmd.indexOf('mmsh://') >=0 || cmd.indexOf('rtsp://') >=0 || cmd.indexOf('rtmp://') >=0 || cmd.indexOf('udp://') >=0 || cmd.indexOf('rtp://') >=0 || cmd.indexOf('http://') >=0 || cmd.indexOf('https://') >=0 || cmd.indexOf('dvb://') >=0) && !this.active_time_shift && stb.cur_place != 'demo' && stb.cur_place != 'internet' && stb.cur_place != 'epg_simple' && stb.cur_place != 'epg' && stb.cur_place != 'radio' && stb.cur_place != 'vclub' && stb.cur_place != 'karaoke' && stb.cur_place != 'audioclub' && !this.cur_media_item.is_audio && !this.cur_media_item.promo && !this.cur_media_item.radio){
             this.is_tv = true;
         }else{
             this.is_tv = false;
@@ -2393,7 +2415,7 @@ player.prototype.play = function(item){
 
     _debug('stb.cur_place', stb.cur_place);
 
-    if (this.media_type == 'stream' && !stb.player.cur_media_item.hasOwnProperty('series')){
+    if (this.media_type == 'stream' && !stb.player.cur_media_item.hasOwnProperty('series') && !stb.player.cur_media_item.hasOwnProperty('is_file')){
 
         if (item.hasOwnProperty('open') && !item.open){
             _debug('channel is closed');
@@ -2412,14 +2434,6 @@ player.prototype.play = function(item){
                 stb.player.on_create_link = function(result){
                     _debug('player.on_create_link', result);
 
-                    /*if (result.error == 'limit'){
-                        stb.notice.show(word['player_limit_notice']);
-                    }else if(result.error == 'nothing_to_play'){
-                        stb.notice.show(word['player_file_missing']);
-                    }else if(result.error == 'link_fault'){
-                        stb.notice.show(word['player_server_error']);
-                    }else{*/
-
                     if (result.error){
                         self.cur_media_item.error = result.error;
                         module.tv.preview_msg.innerHTML = get_word('error_channel_'+result.error);
@@ -2437,27 +2451,30 @@ player.prototype.play = function(item){
                 this.play_now(cmd);
             }
 
-            if (this.is_tv && this.cur_tv_item.lock != '1'){
+            if (this.is_tv){
 
-                this.send_last_tv_id(this.cur_tv_item.id);
+                this.send_last_tv_id(this.cur_tv_item.id, this.cur_tv_item.lock == '1');
 
-                if (stb.user.fav_itv_on){
+                if (this.cur_tv_item.lock != '1') {
 
-                    this.f_ch_idx = this.fav_channels.getIdxByVal('number', item.number);
+                    if (stb.user.fav_itv_on) {
 
-                    this.hist_f_ch_idx.push(item);
-                    this.hist_f_ch_idx.shift();
-                    _debug('this.hist_f_ch_idx', this.hist_f_ch_idx);
-                }else{
+                	this.f_ch_idx = this.fav_channels.getIdxByVal('number', item.number);
 
-                    this.ch_idx = this.channels.getIdxByVal('number', item.number);
+                	this.hist_f_ch_idx.push(item);
+                	this.hist_f_ch_idx.shift();
+                	_debug('this.hist_f_ch_idx', this.hist_f_ch_idx);
+            	    } else {
 
-                    this.hist_ch_idx.push(item);
-                    this.hist_ch_idx.shift();
-                    _debug('this.hist_ch_idx', this.hist_ch_idx);
-                }
-            }
-        }
+                	this.ch_idx = this.channels.getIdxByVal('number', item.number);
+
+                	this.hist_ch_idx.push(item);
+                	this.hist_ch_idx.shift();
+                	_debug('this.hist_ch_idx', this.hist_ch_idx);
+            	    }
+        	}
+    	    }
+	}
 
     }else if (cmd.indexOf('/usbdisk') > 0 || cmd.indexOf('/USB-') > 0 || cmd.indexOf('/ram/mnt/smb/') > 0 || cmd.indexOf('/av/') > 0 || cmd.indexOf('/UPnP/') > 0 || stb.cur_place == 'media_browser'){
 
@@ -2480,6 +2497,12 @@ player.prototype.play = function(item){
         var series_number = item.cur_series || 0;
         if (stb.player.cur_media_item.rtsp_url) {
             cmd = '/media/'+this.cur_media_item.id+'.mpg';
+
+            if (this.cur_media_item.hasOwnProperty('position')){
+                cmd += ' position:'+this.cur_media_item.position;
+            }
+        }else if(stb.player.cur_media_item.is_file){
+            cmd = '/media/file_'+this.cur_media_item.id+'.mpg';
 
             if (this.cur_media_item.hasOwnProperty('position')){
                 cmd += ' position:'+this.cur_media_item.position;
@@ -2555,12 +2578,12 @@ player.prototype.play_now = function(item){
         if (item.hasOwnProperty('streamer_id')){
             _log('play', {"streamer_id" : item.streamer_id, "link_id" : (item.link_id || 0), "ch_id" : item.id}, this.cur_media_item.id);
         }else{
-            _log('play', uri, this.cur_media_item.id);
+            _log('play', item);
         }
 
     }else{
         uri = item;
-        _log('play', uri, this.cur_media_item.id);
+        _log('play', uri);
     }
 
     this.start_time = Date.parse(new Date())/1000;
@@ -2639,6 +2662,27 @@ player.prototype.stop = function(){
     _debug('player.stop');
 
     this.on_stop && this.on_stop();
+
+    if (stb.cur_place == 'vclub' && !this.play_auto_ended){
+
+        var cur_series = this.cur_media_item.cur_series || 0;
+        var end_time   = stb.GetPosTime();
+
+        if (this.cur_media_item.media_type == 'vclub_ad'){
+            module && module.vclub && module.vclub.set_ad_ended_time && module.vclub.set_ad_ended_time(this.cur_media_item.ad_id, end_time, stb.GetMediaLen());
+        }else{
+            module && module.vclub && module.vclub.set_not_ended && module.vclub.set_not_ended(this.cur_media_item.id, cur_series, end_time);
+        }
+    }
+
+    if (stb.cur_place == 'vclub' && this.play_auto_ended){
+
+        if (this.cur_media_item.media_type == 'vclub_ad'){
+            module && module.vclub && module.vclub.set_ad_ended_time && module.vclub.set_ad_ended_time(this.cur_media_item.ad_id, end_time, stb.GetMediaLen());
+        }else{
+            module && module.vclub && module.vclub.set_ended && module.vclub.set_ended(this.cur_media_item.id);
+        }
+    }
 
     if (this.cur_media_item.stop_callback){
         this.cur_media_item.stop_callback();
@@ -2722,27 +2766,6 @@ player.prototype.stop = function(){
         //stb.Umount();
         var storage = stb.mounted_storage;
         this.umount_timer = window.setTimeout(function(){stb.Umount(storage)}, 10000);
-    }
-
-    if (stb.cur_place == 'vclub' && !this.play_auto_ended){
-
-        var cur_series = this.cur_media_item.cur_series || 0;
-        var end_time   = stb.GetPosTime();
-
-        if (this.cur_media_item.media_type == 'vclub_ad'){
-            module && module.vclub && module.vclub.set_ad_ended_time && module.vclub.set_ad_ended_time(this.cur_media_item.ad_id, end_time, stb.GetMediaLen());
-        }else{
-            module && module.vclub && module.vclub.set_not_ended && module.vclub.set_not_ended(this.cur_media_item.id, cur_series, end_time);
-        }
-    }
-
-    if (stb.cur_place == 'vclub' && this.play_auto_ended){
-
-        if (this.cur_media_item.media_type == 'vclub_ad'){
-            module && module.vclub && module.vclub.set_ad_ended_time && module.vclub.set_ad_ended_time(this.cur_media_item.ad_id, end_time, stb.GetMediaLen());
-        }else{
-            module && module.vclub && module.vclub.set_ended && module.vclub.set_ended(this.cur_media_item.id);
-        }
     }
 
     this.play_auto_ended = false;
@@ -3201,7 +3224,7 @@ player.prototype.show_info = function(item, direct_call){
             self.info.dom_obj.hide();
             self.info.on = false;
         },
-        this.info.hide_timer);
+        this.info.hide_timer * (this.info.epg.getAttribute("descr") == "1" ? 4 : 1));
     }catch(e){
         _debug(e);
     }
@@ -3308,11 +3331,11 @@ player.prototype.switch_channel = function(dir, show_info, do_not_invert){
                 this.f_ch_idx = this._find_nearest_ch_idx(dir, {"tv_genre_id" : module.tv.genre.id});
 
                 _debug('nearest this.f_ch_idx', this.f_ch_idx);
-            }else{
+            } else {
             
-                if (this.f_ch_idx < this.fav_channels.length-1){
+                if (this.f_ch_idx < this.fav_channels.length - 1){
                     this.f_ch_idx++;
-                }else{
+                } else {
                     this.f_ch_idx = 0;
                 }
             }
@@ -3327,11 +3350,11 @@ player.prototype.switch_channel = function(dir, show_info, do_not_invert){
                 this.ch_idx = this._find_nearest_ch_idx(dir, {"tv_genre_id" : module.tv.genre.id});
 
                 _debug('nearest this.ch_idx', this.ch_idx);
-            }else{
+            } else {
             
-                if (this.ch_idx < this.channels.length-1){
+                if (this.ch_idx < this.channels.length - 1){
                     this.ch_idx++;
-                }else{
+                } else {
                     this.ch_idx = 0;
                 }
             }
@@ -3351,8 +3374,8 @@ player.prototype.switch_channel = function(dir, show_info, do_not_invert){
             }else{
                 if (this.f_ch_idx > 0){
                     this.f_ch_idx--;
-                }else{
-                    this.f_ch_idx = this.fav_channels.length-1;
+                } else {
+                    this.f_ch_idx = this.fav_channels.length - 1;
                 }
             }
             
@@ -3428,7 +3451,7 @@ player.prototype.send_last_tv_id = function(id){
         return;
     }
 
-    this.last_tv_id = id;
+    this.last_tv_id = stb.user.last_itv_id = id;
 
     stb.load(
 
@@ -3540,14 +3563,14 @@ player.prototype.update_played_tv_archive_end_time = function(id){
     );
 };
 
-player.prototype.send_played_video = function(id){
-    _debug('player.send_played_video', id);
+player.prototype.send_played_video = function(video_id){
+    _debug('player.send_played_video', video_id);
     
     stb.load(
         {
             "type"       : "vod",
             "action"     : "set_played",
-            "video_id"   : id,
+            "video_id"   : video_id,
             "storage_id" : this.last_storage_id
         },
         
@@ -3817,7 +3840,7 @@ player.prototype.bind = function(){
     
     (function(){
         
-        if (!module.tv.on){
+        if (!module.tv || !module.tv.on){
             this.con_menu && this.con_menu.show && this.con_menu.show();
         }
         
@@ -4857,7 +4880,7 @@ player.prototype.show_quick_ch_switch = function(num){
         this.quick_ch_switch.on = true;
     }
     
-    if (this.quick_ch_switch.input.innerHTML.length < 3){
+    if (this.quick_ch_switch.input.innerHTML.length < 5){
         if (this.quick_ch_switch.input.innerHTML.length == 0 && num == 0){
             
         }else{
@@ -5249,7 +5272,7 @@ player.prototype.audio_pid = {
         var map = [];
         
         for (var i=0; i<this.all_pids.length; i++){
-            
+
             if (this.all_pids[i].lang[1] != ''){
                 lang = ' - ' + this.all_pids[i].lang[1];
             }else if (this.all_pids[i].lang[0] != ''){
@@ -5336,7 +5359,7 @@ player.prototype.subtitle_pid = {
         _debug('this.cur_pid_idx', this.cur_pid_idx);
         _debug('this.all_pids', this.all_pids);
 
-        this.all_pids[this.cur_pid_idx].selected = false;
+        this.all_pids[this.cur_pid_idx].selected = true;
         this.cur_pid = pid;
         this.cur_pid_idx = this.all_pids.getIdxByVal('pid', this.cur_pid);
     },
@@ -5394,7 +5417,7 @@ player.prototype.subtitle_pid = {
                 lang = '';
             }
             
-            title = get_word('player_subtitle') + (i+1) + lang;
+            title = get_word('player_subtitle') + ' ' + (i+1) + lang;
         
             map.push({'title' : title, 'cmd' : (function(pid){return function(){stb.player.subtitle_pid.set(pid)}})(this.all_pids[i].pid), 'active' : this.all_pids[i].selected});
         }
@@ -5489,19 +5512,20 @@ player.prototype.build_con_menu = function(){
     _debug('player.build_con_menu');
     
     if (this.con_menu.map.length > 2){
-        return;
+        this.con_menu.map.splice(0, this.con_menu.map.length - 2);
     }
 
     if (stb && stb.Set3DConversionMode){
+        var mode = stb.Get3DConversionMode ? stb.Get3DConversionMode(): 0;
         this.con_menu.map.unshift(
             {
                 "title" : get_word('3D mode'),
                 "type"  : "switch",
                 "cmd"   : [
-                    {"title" : get_word('mode {0}').format(1), "cmd" : function(){_debug('mode 1'); stb.Set3DConversionMode(0)}, active : true},
-                    {"title" : get_word('mode {0}').format(2), "cmd" : function(){_debug('mode 2'); stb.Set3DConversionMode(1)}},
-                    {"title" : get_word('mode {0}').format(3), "cmd" : function(){_debug('mode 3'); stb.Set3DConversionMode(2)}},
-                    {"title" : get_word('mode {0}').format(4), "cmd" : function(){_debug('mode 4'); stb.Set3DConversionMode(3)}}
+                    {"title" : get_word('mode {0}').format(1), "cmd" : function(){_debug('mode 1'); stb.Set3DConversionMode(0)}, active : (mode == 0)},
+                    {"title" : get_word('mode {0}').format(2), "cmd" : function(){_debug('mode 2'); stb.Set3DConversionMode(1)}, active : (mode == 1)},
+                    {"title" : get_word('mode {0}').format(3), "cmd" : function(){_debug('mode 3'); stb.Set3DConversionMode(2)}, active : (mode == 2)},
+                    {"title" : get_word('mode {0}').format(4), "cmd" : function(){_debug('mode 4'); stb.Set3DConversionMode(3)}, active : (mode == 3)}
                 ]
             }
         );
@@ -5557,7 +5581,7 @@ player.prototype.video_claim = function(type){
         {
             "type"      : "vod",
             "action"    : "set_claim",
-            "id"        : this.cur_media_item.id,
+            "id"        : this.cur_media_item.video_id || this.cur_media_item.id,
             "real_type" : type
         },
         function(result){
