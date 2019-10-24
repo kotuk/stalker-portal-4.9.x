@@ -278,7 +278,7 @@ BaseLayer.prototype.init_header_path = function(begin){
     
     this.header_path = this.create_block('mb_header_first');
     this.path_container = document.createElement('span');
-    this.header_path.innerHTML = begin + ' / ';
+    this.header_path.innerHTML = begin + ' /';
     this.header_path.appendChild(this.path_container);
     this.dom_obj.appendChild(this.header_path);
 };
@@ -303,9 +303,9 @@ BaseLayer.prototype.update_header_path = function(map){
     }
     
     for (i=0; i<this.header_path_map.length; i++){
-        path += '<span>'+this.header_path_map[i].title+'</span>';
+        path += ' <span>'+this.header_path_map[i].title+'</span>';
     }
-    
+
     this.path_container.innerHTML = path;
 };
 

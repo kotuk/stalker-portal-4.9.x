@@ -149,6 +149,8 @@ vclub_info.prototype.fill = function(item){
     }else{
         this.film_cover.innerHTML = '';
     }
+
+    this.scrollbar.render();
 };
 
 vclub_info.prototype.shift = function(dir){
