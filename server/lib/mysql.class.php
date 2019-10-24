@@ -734,7 +734,7 @@ class Mysql
             }
         }
 
-        if (Mysql::$debug)
+        //if (Mysql::$debug)
             //var_dump($this->get_tags(get_object_vars($this)));
 
         if (Config::getSafe('query_cache', false) && $this->allow_caching) {
