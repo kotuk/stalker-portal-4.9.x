@@ -23,47 +23,59 @@ class CourseCbr implements \Stalker\Lib\StbApi\CourseCbr
     }
     
     public function getDataFromURI(){
+
         $result = array();
-        $content = file_get_contents($this->content_url);
-        if ($content){
-            //preg_match("/<td class=\"date\">([\d,\.]+)<\/td>/",$content,$arr);
-            preg_match("/Date=\"([\d,\.]+)\" name/",$content,$arr);
-            $result['title'] = _('Exchange rate on').' '.$arr[1];
-            $result['on_date'] = $arr[1];
+
+        $context = stream_context_create(
+            array(
+                'http' => array(
+                    'follow_location' => false
+                )
+            )
+        );
+
+	$content = file_get_contents($this->content_url, false, $context);
+
+	$xml_obj = NULL;
+
+        if ($content && ($xml_obj = simplexml_load_string($content))) {
+
+            $xml_attr = $xml_obj->attributes();
+
+            $result['title'] = _('Exchange rate on').' '. (string) $xml_attr['Date'];
+            $result['on_date'] = (string) $xml_attr['Date'];
             $result['data'] = array();
             $idx = 0;
-            
+
             $old_data = $this->getDataFromDBCache();
 
             if (!array_key_exists('on_date', $old_data) || $result['on_date'] != $old_data['on_date']){
-            //if (1){
-            
-                foreach ($this->codes as $code){
-                    //preg_match("/<td class=\"cell_c\">$code<\/td>\s*<td class=\"cell_c\">([\S]+)<\/td>\s*<td class=\"cell_c\">([\d]+)<\/td>\s*<td class=\"cell\">(.*)<\/td>\s*<td class=\"cell_c\">([\d,\.]+)<\/td>/",$content,$arr2);
-                    preg_match("/<NumCode>$code<\/NumCode>\s*<CharCode>([\S]+)<\/CharCode>\s*<Nominal>([\d]+)<\/Nominal>\s*<Name>(.*)<\/Name>\s*<Value>([\d,\.]+)<\/Value>/",$content,$arr2);
 
-                    //var_dump($arr2);
+                foreach ($xml_obj as $valute){
 
-                    $result['data'][$idx] = array();
-                    $result['data'][$idx]['code'] = $code;
-                    $result['data'][$idx]['currency'] = $arr2[2].' '.$arr2[1];
-                    $result['data'][$idx]['value'] = floatval(str_replace(',', '.', $arr2[4]));
-                    
-                    $result['data'][$idx]['diff'] = 0;
-                    $result['data'][$idx]['trend'] = 0;
-                    
-                    if (is_array($old_data) && array_key_exists('data', $old_data) && array_key_exists($idx, $old_data['data'])){
-                    
-                        $result['data'][$idx]['diff'] = round(($result['data'][$idx]['value'] - $old_data['data'][$idx]['value']), 4);
-                        
-                        if ($result['data'][$idx]['diff'] > 0){
-                            $result['data'][$idx]['trend'] = 1;
-                        }else if ($result['data'][$idx]['diff'] < 0){
-                            $result['data'][$idx]['trend'] = -1;
+                    if ($valute->NumCode && in_array($valute->NumCode, $this->codes)) {
+                        $result['data'][$idx] = array();
+                        $result['data'][$idx]['code'] = (string)$valute->NumCode;
+                        $result['data'][$idx]['currency'] = $valute->Nominal.' '.$valute->CharCode;
+                        $result['data'][$idx]['value'] = floatval(str_replace(',', '.', $valute->Value));
+
+                        $result['data'][$idx]['diff'] = 0;
+                        $result['data'][$idx]['trend'] = 0;
+
+                        if (is_array($old_data) && array_key_exists('data', $old_data) && array_key_exists($idx, $old_data['data'])){
+
+                            $result['data'][$idx]['diff'] = round(($result['data'][$idx]['value'] - $old_data['data'][$idx]['value']), 4);
+
+                            if ($result['data'][$idx]['diff'] > 0){
+                                $result['data'][$idx]['trend'] = 1;
+                            }else if ($result['data'][$idx]['diff'] < 0){
+                                $result['data'][$idx]['trend'] = -1;
+                            }
+
                         }
+
+			 $idx++;
                     }
-                    
-                    $idx++;
                 }
                 
                 $this->setDataDBCache($result);

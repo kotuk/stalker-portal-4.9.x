@@ -36,7 +36,7 @@ class User implements \Stalker\Lib\StbApi\User
 
         $country = self::getCountryCode();
 
-        if ($country && $country != $this->profile['country']){
+        if ($country && $country != $this->profile['country'] && $this->id != 0){
             Mysql::getInstance()->update('users', array('country' => $country), array('id' => $this->id));
         }
 

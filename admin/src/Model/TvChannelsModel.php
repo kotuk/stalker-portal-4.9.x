@@ -235,7 +235,7 @@ class TvChannelsModel extends \Model\BaseStalkerModel {
     }
     
     public function deleteCHLink($links) {
-        $this->mysqlInstance->query("delete from ch_links where id in (" . implode(",", $links) . ")");
+        return $this->mysqlInstance->query("delete from ch_links where id in (" . implode(",", $links) . ")")->total_rows();
     }
     
     public function deleteCHLinkOnStreamer($links) {
