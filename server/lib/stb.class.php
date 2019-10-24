@@ -1202,8 +1202,13 @@ class Stb implements \Stalker\Lib\StbApi\Stb
         $param  = urldecode($_REQUEST['param']);
         $type   = $_REQUEST['tmp_type'];
 
-        if ($type == 1 && !empty($_REQUEST['ch_id'])){
+        if ($type == 1 && !empty($_REQUEST['ch_id'])) {
             $param = $this->db->from('itv')->where(array('id' => (int) $_REQUEST['ch_id']))->get()->first('cmd');
+        }
+
+        if ($type == 0 && $action == 'stop') {
+            $param_tmp = $this->db->from('users')->where(array('mac' => $this->mac))->get()->first('now_playing_content');
+            $param = $this->db->from('itv')->where(array('name' => $param_tmp))->get()->first('cmd');
         }
         
         $this->db->insert('user_log',
