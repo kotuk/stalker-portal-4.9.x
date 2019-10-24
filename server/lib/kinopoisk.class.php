@@ -2,16 +2,22 @@
 
 class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
 {
-    public static function getInfoById($id){
+    public static function getInfoById($id, $type = NULL){
 
         $movie_info = array('kinopoisk_id' => $id);
 
-        $movie_url = 'http://www.kinopoisk.ru/film/'.$id.'/';
+        $short_id = '';
 
-        $movie_info['kinopoisk_url'] = $movie_url;
-        $movie_info['cover'] = 'http://st.kinopoisk.ru/images/film/'.$id.'.jpg';
+        if(preg_match("/(.*)-(.*)$/", $id, $match)) {
+            $short_id = $match[2];
+        } else {
+            $short_id = $id;
+        }
 
-        $cover_big_url = 'http://st.kinopoisk.ru/images/film_big/'.$id.'.jpg';
+        $movie_url = 'https://www.kinopoisk.ru/film/'.$id.'/';
+        $cover_big_url = 'https://st.kp.yandex.net/images/film_big/'.$short_id.'.jpg';
+
+        $movie_info['cover'] = 'https://st.kp.yandex.net/images/film_iphone/iphone360_'.$short_id.'.jpg';
 
         $big_cover_headers = get_headers($cover_big_url, 1);
 
@@ -30,6 +36,7 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
             CURLOPT_URL => $movie_url,
             CURLOPT_HEADER => false,
             CURLOPT_RETURNTRANSFER => true,
+	    CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_HTTPHEADER => array(
                 'Connection: keep-alive',
                 'Cache-Control: no-cache',
@@ -73,7 +80,7 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
         }
 
         if (empty($movie_info['name'])){
-            throw new KinopoiskException("Movie name in '".$movie_url."' not found", $page);
+            throw new KinopoiskException(sprintf(_("Movie name in '%s' not found"), $movie_url), $page); 
         }
 
         // Original name
@@ -86,6 +93,9 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
         if (empty($movie_info['o_name'])){
             $movie_info['o_name'] = $movie_info['name'];
         }
+
+        // Fix kinopoisk id
+        $movie_info['kinopoisk_id'] = $short_id;
 
         // Year
         $node_list = $xpath->query('//*[@id="infoTable"]/table/tr[1]/td[2]/div/a');
@@ -147,7 +157,7 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
         if ($node_list !== false && $node_list->length != 0){
             $class = $node_list->item(0)->attributes->getNamedItem('class')->nodeValue;
             $movie_info['age'] = substr($class, strrpos($class, 'age')+3);
-            if ($movie_info['age']){
+            if (is_numeric($movie_info['age'])){
                 $movie_info['age'] .= '+';
             }
         }
@@ -204,14 +214,14 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
         $ch = curl_init();
 
         if ($ch === false){
-            throw new KinopoiskException("Curl initialization error", curl_error($ch));
+            throw new KinopoiskException(_("Curl initialization error"), curl_error($ch));
         }
 
         $orig_name = iconv("utf-8", "windows-1251", $orig_name);
 
         $orig_name = urlencode($orig_name);
 
-        $search_url = 'http://www.kinopoisk.ru/index.php?level=7&from=forma&result=adv&m_act[from]=forma&m_act[what]=content&m_act[find]='.$orig_name.'&m_act[content_find]=film,serial&first=yes';
+        $search_url = 'https://www.kinopoisk.ru/index.php?level=7&from=forma&result=adv&m_act[from]=forma&m_act[what]=content&m_act[find]='.$orig_name.'&m_act[content_find]=film,serial&first=yes';
 
         $curl_options = array(
             CURLOPT_URL => $search_url,
@@ -244,7 +254,7 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
         curl_close($ch);
 
         if ($response === false){
-            throw new KinopoiskException("Curl exec failure", curl_error($ch));
+            throw new KinopoiskException(_("Curl exec failure"), curl_error($ch));
         }
 
         if (preg_match("/Location: ([^\s]*)/", $response, $match)){
@@ -252,17 +262,17 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
         }
 
         if (empty($location)){
-            throw new KinopoiskException("Empty location header", $response);
+            throw new KinopoiskException(_("Empty location header"), $response);
         }
 
         if (strpos($location, 'http') === 0){
-            throw new KinopoiskException("Wrong location header. Location: ('".$location."')", $response);
+            throw new KinopoiskException(_("Wrong location header.") . " " . sprintf(_("Location: ('%s')"), $location), $response);
         }
 
         if (preg_match("/\/([\d]*)\/$/", $location, $match)){
             $movie_id = $match[1];
         }else{
-            throw new KinopoiskException("Location does not contain movie id. Location: ('".$location."')", $response);
+            throw new KinopoiskException(_("Location does not contain movie id.") . " " . sprintf(_("Location: ('%s')"), $location), $response);
         }
 
         return self::getInfoById($movie_id);
@@ -281,18 +291,18 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
         return array_intersect_key($info, $fields);
     }
 
-    public static function getRatingById($kinopoisk_id){
+    public static function getRatingById($kinopoisk_id, $type = NULL){
 
         $result = array(
             'kinopoisk_id' => $kinopoisk_id
         );
 
-        $xml_url = 'http://www.kinopoisk.ru/rating/'.$kinopoisk_id.'.xml';
+        $xml_url = 'https://www.kinopoisk.ru/rating/'.$kinopoisk_id.'.xml';
 
         $xml = @simplexml_load_file($xml_url);
 
         if (!$xml){
-            throw new KinopoiskException("Can't get rating from ".$xml_url."; ".implode(', ', libxml_get_errors()), '');
+            throw new KinopoiskException(_("Can't get rating from") . " " .$xml_url."; ".implode(', ', libxml_get_errors()), '');
         }
 
         $result['rating_kinopoisk']       = (string) $xml->kp_rating;
