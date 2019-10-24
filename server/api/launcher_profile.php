@@ -77,7 +77,6 @@ $module_to_app_map = array(
     'audioclub'     => 'audio club',
     'media_browser' => 'explorer',
     'weather.day'   => 'weather',
-    'ex'            => 'ex.ua',
     'game.lines'    => 'lines',
     'game.memory'   => 'memory',
     'game.sudoku'   => 'sudoku',
