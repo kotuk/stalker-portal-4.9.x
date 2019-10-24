@@ -128,6 +128,7 @@ class Epg implements \Stalker\Lib\StbApi\Epg
         $data_arr = array();
 
         $start_time = microtime(1);
+        $now_time = time();
 
         $total_need_to_delete = array();
         foreach ($xml->programme as $programme){
@@ -138,6 +139,8 @@ class Epg implements \Stalker\Lib\StbApi\Epg
                 $start = strtotime(strval($programme->attributes()->start));
                 $stop  = strtotime(strval($programme->attributes()->stop));
 
+                $id_event = $programme->attributes()->id;
+
                 $title = strval($this->getElementByLangCode($programme->title, $setting['lang_code']));
                 $descr = strval($this->getElementByLangCode($programme->desc, $setting['lang_code']));
 
@@ -146,7 +149,6 @@ class Epg implements \Stalker\Lib\StbApi\Epg
                 $actor    = array();
 
                 if (!empty($programme->category)){
-
                     foreach ($programme->category as $_category){
                         $category[] = strval($this->getElementByLangCode($_category, $setting['lang_code']));
                     }
@@ -155,7 +157,6 @@ class Epg implements \Stalker\Lib\StbApi\Epg
                 $category = implode(', ', $category);
 
                 if (!empty($programme->credits->director)){
-
                     foreach ($programme->credits->director as $_director){
                         $director[] = strval($this->getElementByLangCode($_director, $setting['lang_code']));
                     }
@@ -201,20 +202,23 @@ class Epg implements \Stalker\Lib\StbApi\Epg
 
                     $this->real_ids[$real_id] = true;
 
-                    $data_arr[] = array(
-                                            'ch_id'    => $itv_id,
-                                            'time'     => $mysql_start,
-                                            'time_to'  => $mysql_stop,
-                                            'duration' => $duration,
-                                            'real_id'  => $real_id,
-                                            'name'     => $title,
-                                            'descr'    => $descr,
-                                            'category' => $category,
-                                            'director' => $director,
-                                            'actor'    => $actor
-                                            );
+                    if ($start > $now_time) {
+                        $data_arr[] = array(
+                        	'ch_id'    => $itv_id,
+                        	'time'     => $mysql_start,
+                        	'time_to'  => $mysql_stop,
+                        	'duration' => $duration,
+                        	'real_id'  => $real_id,
+                        	'name'     => $title,
+                        	'descr'    => $descr,
+                        	'category' => $category,
+                        	'director' => $director,
+                        	'actor'    => $actor,
+                        	'id_event' => $id_event
+                        );
 
-                    $this->channels_updated[$itv_id] = 1;
+                        $this->channels_updated[$itv_id] = 1;
+                    }
                 }
             }
         }
@@ -225,7 +229,9 @@ class Epg implements \Stalker\Lib\StbApi\Epg
 
         if (!empty($total_need_to_delete)){
             Mysql::getInstance()->query('delete from epg where id in ('.implode(', ', array_unique($total_need_to_delete)).')');
-            Mysql::getInstance()->query('OPTIMIZE TABLE epg');
+            if (Config::getSafe('use_optimize_table', true)) {
+                Mysql::getInstance()->query('OPTIMIZE TABLE epg');
+            }
         }
 
         if (!empty($data_arr)){
@@ -342,6 +348,8 @@ class Epg implements \Stalker\Lib\StbApi\Epg
 
         $real_from = date("Y-m-d H:i:s", $date);
 
+        $now_from = date("Y-m-d H:i:s", time());
+
         $date = date("Y-m-d", $date);
 
         $from = $date." 00:00:00";
@@ -359,6 +367,7 @@ class Epg implements \Stalker\Lib\StbApi\Epg
                 ->where(array(
                     'ch_id'  => $itv_id,
                     'time>=' => $real_from,
+                    'time>=' => $now_from,
                     'time<'  => $to
                 ))
                 ->get()
