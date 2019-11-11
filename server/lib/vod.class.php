@@ -371,31 +371,6 @@ class Vod extends AjaxResponse implements \Stalker\Lib\StbApi\Vod
         }
 
         return $this->saveFav($favorites, $this->stb->id);
-
-        /*if ($fav_video === null){
-            $this->db->insert('fav_vclub',
-                               array(
-                                    'uid'       => $this->stb->id,
-                                    'fav_video' => serialize(array($new_id)),
-                                    'addtime'   => 'NOW()'
-                               ));
-             return true;                      
-        }
-        
-        if (!in_array($new_id, $fav_video)){
-            
-            $fav_video[] = $new_id;
-            $fav_video_s = serialize($fav_video);
-            
-            $this->db->update('fav_vclub',
-                               array(
-                                    'fav_video' => $fav_video_s,
-                                    'edittime'  => 'NOW()'),
-                               array('uid' => $this->stb->id));
-            
-        }
-        
-        return true;*/
     }
 
     public function saveFav(array $fav_array, $uid)
@@ -408,8 +383,6 @@ class Vod extends AjaxResponse implements \Stalker\Lib\StbApi\Vod
         $fav_videos_str = serialize($fav_array);
 
         $fav_video = $this->getFav($uid);
-
-        //var_dump($this->stb->id, $fav_video);
 
         if ($fav_video === null) {
             return $this->db->insert('fav_vclub',
@@ -434,24 +407,6 @@ class Vod extends AjaxResponse implements \Stalker\Lib\StbApi\Vod
         }
 
         return $this->getFavByUid($uid);
-
-        /*$fav_video_arr = $this->db->from('fav_vclub')->where(array('uid' => $this->stb->id))->get()->first();
-
-       if ($fav_video_arr === null){
-           return null;
-       }
-
-       if (empty($fav_video_arr)){
-           return array();
-       }
-
-       $fav_video = unserialize($fav_video_arr['fav_video']);
-
-       if (!is_array($fav_video)){
-           $fav_video = array();
-       }
-
-       return $fav_video;*/
     }
 
     public function getFavByUid($uid)
@@ -532,11 +487,6 @@ class Vod extends AjaxResponse implements \Stalker\Lib\StbApi\Vod
         $series = intval($_REQUEST['series']);
         $end_time = intval($_REQUEST['end_time']);
 
-        /*$not_ended = $this->db->getFirstData('vclub_not_ended',
-        array(
-             'uid' => $this->stb->id,
-             'video_id' => $video_id
-        ));*/
         $not_ended = $this->db->from('vclub_not_ended')
             ->where(array(
             'uid' => $this->stb->id,
@@ -682,7 +632,6 @@ class Vod extends AjaxResponse implements \Stalker\Lib\StbApi\Vod
 
         $data = $data->like($like)
             ->like($search, 'OR ')
-        //->groupby('video.path')
             ->limit(self::max_page_items, $offset);
 
         return $data;
@@ -746,7 +695,6 @@ class Vod extends AjaxResponse implements \Stalker\Lib\StbApi\Vod
             $result = $result->from('vclub_not_ended')
                 ->select('vclub_not_ended.series as cur_series, vclub_not_ended.end_time as position')
                 ->where('video.id=vclub_not_ended.video_id', 'AND ', null, -1)
-                /*->where(array('vclub_not_ended.uid' => $this->stb->id));*/
                 ->in('vclub_not_ended.uid',  $ids_on_ls);
         }
 
@@ -830,10 +778,6 @@ class Vod extends AjaxResponse implements \Stalker\Lib\StbApi\Vod
                 $this->response['data'][$i]['cur_series'] = $not_ended[$this->response['data'][$i]['id']]['series'];
             }
 
-            //$this->response['data'][$i]['screenshot_uri'] = $this->getImgUri($this->response['data'][$i]['screenshot_id']);
-
-            //var_dump('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!', $this->response['data'][$i]['screenshots']);
-
             if ($this->response['data'][$i]['screenshots'] === null) {
                 $this->response['data'][$i]['screenshots'] = '0';
             }
@@ -873,27 +817,11 @@ class Vod extends AjaxResponse implements \Stalker\Lib\StbApi\Vod
 
         $added_time = strtotime($datetime);
 
-        $added_arr = array(
-            //'str'       => '',
-            //'bg_level'  => ''
-        );
+        $added_arr = array();
 
-        $this_mm = date("m");
-        $this_dd = date("d");
-        $this_yy = date("Y");
+        $added_date = date("d", $added_time) . ' ' . $this->months[date("n", $added_time) - 1] . ' ' . date("Y", $added_time);
 
-        if ($added_time > mktime(0, 0, 0, $this_mm, $this_dd, $this_yy)) {
-            //$added_arr['today'] = System::word('vod_today');
-            $added_arr['today'] = _('today');
-        } elseif ($added_time > mktime(0, 0, 0, $this_mm, $this_dd - 1, $this_yy)) {
-            //$added_arr['yesterday'] = System::word('vod_yesterday');
-            $added_arr['yesterday'] = _('yesterday');
-        } elseif ($added_time > mktime(0, 0, 0, $this_mm, $this_dd - 7, $this_yy)) {
-            //$added_arr['week_and_more'] = System::word('vod_last_week');
-            $added_arr['week_and_more'] = _('last week');
-        } else {
-            $added_arr['week_and_more'] = $this->months[date("n", $added_time) - 1] . ' ' . date("Y", $added_time);
-        }
+        $added_arr['today'] = $added_arr['yesterday'] = $added_arr['week_and_more'] = $added_date;
 
         return $added_arr;
     }
