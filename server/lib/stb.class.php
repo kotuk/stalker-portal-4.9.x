@@ -537,19 +537,6 @@ class Stb implements \Stalker\Lib\StbApi\Stb
             if (!empty($match[1])){
                 $player_version = hexdec($match[1]);
             }
-
-            if (empty($player_version) || empty($match) || $player_version < 1382){
-
-                $auto_update_setting = ImageAutoUpdate::getSettingByStbType($this->params['stb_type']);
-
-                return array(
-                    'status'     => 1,
-                    'msg'        => 'old firmware',
-                    'block_msg'  => _('Firmware of your STB is outdated.<br>Please update it.'),
-                    'autoupdate' => empty($auto_update_setting) ? false : $auto_update_setting,
-                    'update_url' => self::getImageUpdateUrl($this->params['stb_type'])
-                );
-            }
         }
 
         $valid_saved_auth = $this->getParam('access_token') && ($this->access_token == $this->getParam('access_token')) && !intval($_REQUEST['not_valid_token']);
