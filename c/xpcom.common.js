@@ -1042,14 +1042,6 @@ function common_xpcom(){
             cut_type = this.type;
         }
 
-        if (this.user['allowed_stb_types'] && this.user['allowed_stb_types'].indexOf(cut_type.toLowerCase()) == -1 && !_GET['debug_key']){
-
-            stb.loader.stop();
-            this.cut_off(get_word('stb_type_not_supported'));
-
-            return;
-        }
-
         if (this.type != 'MAG200' && this.type != 'MAG260' && !_GET['debug_key']){
             var match = /Player Engine version: (\S+)/.exec(this.version);
             _debug('match', match);
@@ -1057,18 +1049,6 @@ function common_xpcom(){
             if (match && match.length == 2){
                 var player_version = parseInt((match[1] + '').replace('0x', '').replace(/[^a-f0-9]/gi, ''), 16);
                 _debug('player_version', player_version);
-            }
-
-            if (!match || match.length != 2 || player_version < 1382){
-
-                stb.loader.stop();
-                this.cut_off(get_word('outdated_firmware'));
-
-                if (['MAG200', 'MAG245','MAG245D', 'MAG250', 'MAG254', 'MAG255', 'MAG270', 'MAG275', 'WR320', 'IP_STB_HD'].indexOf(this.type) >= 0 || this.type.indexOf('AuraHD') != -1){
-                    this.check_image_version();
-                }
-
-                return;
             }
         }
 
