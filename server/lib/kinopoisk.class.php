@@ -5,24 +5,13 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
     public static function getInfoById($id, $type = NULL){
 
         $movie_info = array('kinopoisk_id' => $id);
-
-        $short_id = '';
-
-        if(preg_match("/(.*)-(.*)$/", $id, $match)) {
-            $short_id = $match[2];
-        } else {
-            $short_id = $id;
-        }
-
-        $movie_url = 'https://www.kinopoisk.ru/film/'.$id.'/';
-        $cover_big_url = 'https://st.kp.yandex.net/images/film_big/'.$short_id.'.jpg';
-
-        $movie_info['cover'] = 'https://st.kp.yandex.net/images/film_iphone/iphone360_'.$short_id.'.jpg';
-
+        $movie_url = 'https://www.kinopoisk.ru/film/' . $id . '/';
+        $movie_info['kinopoisk_url'] = $movie_url;
+        $movie_info['cover'] = 'https://kinopoisk.ru/images/film/' . $id . '.jpg';
+        $cover_big_url = 'https://kinopoisk.ru/images/film_big/' . $id . '.jpg';
         $big_cover_headers = get_headers($cover_big_url, 1);
 
         if ($big_cover_headers !== false){
-
             if (strpos($big_cover_headers[0], '302') !== false && !empty($big_cover_headers['Location'])){
                 $movie_info['cover_big'] = $big_cover_headers['Location'];
             }else{
@@ -36,7 +25,7 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
             CURLOPT_URL => $movie_url,
             CURLOPT_HEADER => false,
             CURLOPT_RETURNTRANSFER => true,
-	    CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_HTTPHEADER => array(
                 'Connection: keep-alive',
                 'Cache-Control: no-cache',
@@ -94,9 +83,6 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
             $movie_info['o_name'] = $movie_info['name'];
         }
 
-        // Fix kinopoisk id
-        $movie_info['kinopoisk_id'] = $short_id;
-
         // Year
         $node_list = $xpath->query('//*[@id="infoTable"]/table/tr[1]/td[2]/div/a');
 
@@ -144,7 +130,6 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
         }
 
         // Description
-        //$node_list = $xpath->query('//*[@id="syn"]/tr[1]/td/table/tr[1]/td');
         $node_list = $xpath->query('//div[@itemprop="description"]');
 
         if ($node_list !== false && $node_list->length != 0){
@@ -319,8 +304,6 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
     private static function getNodeText($node){
 
         $text = html_entity_decode($node->nodeValue);
-
-        //$text = str_replace('&nbsp;', ' ', $text);
 
         $rules = array(
             "/\x{0085}/u" => "...",
