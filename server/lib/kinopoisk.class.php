@@ -6,6 +6,13 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
 
         $movie_info = array('kinopoisk_id' => $id);
         $movie_url = 'https://www.kinopoisk.ru/film/' . $id . '/';
+        $series_url = 'https://www.kinopoisk.ru/series/' . $id . '/';
+        $headers = @get_headers($series_url);
+        $is_film = true;
+        if (strpos($headers[0], '404') == 0) {
+            $movie_url = 'https://www.kinopoisk.ru/series/' . $id . '/';
+            $is_film = false;
+        }
         $movie_info['kinopoisk_url'] = $movie_url;
         $movie_info['cover'] = 'https://kinopoisk.ru/images/film/' . $id . '.jpg';
         $cover_big_url = 'https://kinopoisk.ru/images/film_big/' . $id . '.jpg';
@@ -55,6 +62,7 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
         //var_dump($page);
 
         libxml_use_internal_errors(true);
+        $page = mb_convert_encoding($page, 'HTML-ENTITIES', "UTF-8");
         $dom = new DomDocument();
         $dom->loadHTML($page);
         libxml_use_internal_errors(false);
@@ -62,7 +70,11 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
         $xpath = new DomXPath($dom);
 
         // Translated name
-        $node_list = $xpath->query('//*[@id="headerFilm"]/h1');
+        if ($is_film) {
+            $node_list = $xpath->query('//*[@id="headerFilm"]/h1');
+        } else {
+            $node_list = $xpath->query('//*[@class="film-header-group film-basic-info__title"]/h1');
+        }
 
         if ($node_list !== false && $node_list->length != 0){
             $movie_info['name'] = self::getNodeText($node_list->item(0));
@@ -73,7 +85,12 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
         }
 
         // Original name
-        $node_list = $xpath->query('//*[@id="headerFilm"]/span');
+        if ($is_film) {
+            $node_list = $xpath->query('//*[@id="headerFilm"]/span');
+        } else {
+            $node_list = $xpath->query('//*[@class="film-header-group film-basic-info__title"]/div/span');
+        }
+
 
         if ($node_list !== false && $node_list->length != 0){
             $movie_info['o_name'] = self::getNodeText($node_list->item(0));
@@ -84,7 +101,11 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
         }
 
         // Year
-        $node_list = $xpath->query('//*[@id="infoTable"]/table/tr[1]/td[2]/div/a');
+        if ($is_film) {
+            $node_list = $xpath->query('//*[@id="infoTable"]/table/tr[1]/td[2]/div/a');
+        } else {
+            $node_list = $xpath->query('//*[@class="table-col-years__years"]');
+        }
 
         if ($node_list !== false && $node_list->length != 0){
             $movie_info['year'] = self::getNodeText($node_list->item(0));
@@ -112,7 +133,11 @@ class Kinopoisk implements \Stalker\Lib\StbApi\vclubinfo
         }
 
         // Actors
-        $node_list = $xpath->query('//*[@id="actorList"]/ul[1]/li');
+        if ($is_film) {
+            $node_list = $xpath->query('//*[@id="actorList"]/ul[1]/li');
+        } else {
+            $node_list = $xpath->query('//*[@class="film-crew-block film-basic-info__film-crew"]/div/div/ul');
+        }
 
         if ($node_list !== false && $node_list->length != 0){
 
